@@ -1,0 +1,40 @@
+version: "3.10"
+
+services:
+  postgres:                                         #database
+    image: postgres:15
+    env_file: .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data #volume mount
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro #bind mount
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  api:                                              #api
+    build: ./backend
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5000:5000"   # temporary (for testing
+  frontend:                                      #frontend
+    build: ./frontend
+    depends_on:
+      - api
+  nginx:                                       #nginx
+    image: nginx:alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - api
+volumes:
+  pgdata:
